@@ -1,0 +1,11 @@
+---
+- hosts: localhost
+  become: yes
+  roles:
+    - role: ansible-role-gerbera-magentatv
+      gerbera_magentatv__udpxy_ip: "192.168.12.58"
+      gerbera_magentatv__load_default_db: false
+      gerbera_magentatv__delete_pc_directory: false
+      gerbera_magentatv__purge_container_contents: false
+
+...

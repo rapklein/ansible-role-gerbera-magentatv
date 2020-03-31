@@ -1,0 +1,112 @@
+---
+# tasks file for ansible-role-gerbera-magentatv
+
+- name: "Make sure required packages are installed"
+  package:
+    name: sqlite3
+    state: present
+
+- name: "Download temp MagentaTV multicast address list"
+  get_url:
+    dest: "{{ gerbera_magentatv__tmp_file }}"
+    url: "{{ gerbera_magentatv__url }}"
+  changed_when: false
+
+- name: "Load MagentaTV multicast address list into the 'channels' variable"
+  include_vars:
+    file: "{{ gerbera_magentatv__tmp_file }}"
+    name: channels
+
+- name: "Backup {{ gerbera_magentatv__sqlite_db }}"
+  archive:
+    path: "{{ gerbera_magentatv__sqlite_db }}"
+
+- name: "Stop Gerbera, if started"
+  service:
+    name: gerbera
+    state: stopped
+
+- name: "Remove {{ gerbera_magentatv__sqlite_db }}"
+  file:
+    path: "{{ gerbera_magentatv__sqlite_db }}"
+    state: absent
+  when: gerbera_magentatv__load_default_db
+
+- name: "Create default {{ gerbera_magentatv__sqlite_db }}"
+  shell:
+    sqlite3 {{ gerbera_magentatv__sqlite_db }} < {{ gerbera_magentatv__sqlite_db_default_schema }}
+  when: gerbera_magentatv__load_default_db
+
+- name: "Make sure correct file ownership of {{ gerbera_magentatv__sqlite_db }} is set"
+  file:
+    path: "{{ gerbera_magentatv__sqlite_db }}"
+    owner: "{{ gerbera_magentatv__owner }}"
+    group: "{{ gerbera_magentatv__owner }}"
+    mode: '0644'
+
+- name: "Make sure PC Directory container is not present in database"
+  command:
+    sqlite3 "{{ gerbera_magentatv__sqlite_db }}" "DELETE FROM mt_cds_object WHERE dc_title = 'PC Directory'; SELECT changes();"
+  register: result
+  changed_when: "result.stdout | int > 0"
+  when: gerbera_magentatv__delete_pc_directory
+
+- name: "Make sure that {{ gerbera_magentatv__container_name }} container is present in database"
+  command: |
+    sqlite3 "{{ gerbera_magentatv__sqlite_db }}"
+    "INSERT INTO mt_cds_object ( object_type, upnp_class, dc_title )
+    SELECT '1', 'object.container', '{{ gerbera_magentatv__container_name }}'
+    WHERE NOT EXISTS (SELECT 1 FROM mt_cds_object WHERE
+    object_type = '1' AND
+    upnp_class = 'object.container' AND
+    dc_title = '{{ gerbera_magentatv__container_name }}');
+    SELECT changes();"
+  register: result
+  changed_when: "result.stdout | int > 0"
+
+- name: "Get id of {{ gerbera_magentatv__container_name }} container in database"
+  command:
+    sqlite3 "{{ gerbera_magentatv__sqlite_db }}" "SELECT id FROM mt_cds_object WHERE upnp_class = 'object.container' and dc_title = '{{ gerbera_magentatv__container_name }}' LIMIT 1;"
+  register: magentatv_container_id
+  changed_when: false
+
+- name: "Purge contents of {{ gerbera_magentatv__container_name }} container in database"
+  command:
+    sqlite3 "{{ gerbera_magentatv__sqlite_db }}" "DELETE FROM mt_cds_object WHERE parent_id = '{{ magentatv_container_id.stdout_lines | last }}'; SELECT changes();"
+  register: result
+  changed_when: "result.stdout | int > 0"
+  when: gerbera_magentatv__purge_container_contents
+
+- name: "Make sure MagentaTV channels are present in {{ gerbera_magentatv__container_name }} container"
+  command: |
+    sqlite3 "{{ gerbera_magentatv__sqlite_db }}"
+    "INSERT INTO mt_cds_object ( parent_id, object_type, upnp_class, dc_title, location, resources, mime_type )
+    SELECT '{{ magentatv_container_id.stdout_lines | last }}', '10', 'object.item.videoItem',
+    '({{ item.channel_pos }}) {{ item.media_name }}',
+    'http://{{ gerbera_magentatv__udpxy_ip }}:{{ gerbera_magentatv__udpxy_port }}/udp/{{ item.media_multicast_sourceip }}@{{ item.media_multicast_ip }}:{{ item.media_multicast_port }}/stream.mpg',
+    '0~protocolInfo=http-get%3A%2A%3Avideo%2Fmpeg2%3A%2A~~', 'video/mpeg2'
+    WHERE NOT EXISTS (SELECT 1 FROM mt_cds_object WHERE
+    parent_id = '{{ magentatv_container_id.stdout_lines | last }}' AND
+    object_type = '10' AND
+    upnp_class = 'object.item.videoItem' AND
+    dc_title = '({{ item.channel_pos }}) {{ item.media_name }}' AND
+    location = 'http://{{ gerbera_magentatv__udpxy_ip }}:{{ gerbera_magentatv__udpxy_port }}/udp/{{ item.media_multicast_sourceip }}@{{ item.media_multicast_ip }}:{{ item.media_multicast_port }}/stream.mpg' AND
+    resources = '0~protocolInfo=http-get%3A%2A%3Avideo%2Fmpeg2%3A%2A~~' AND mime_type = 'video/mpeg2'); SELECT changes();"
+  register: result
+  changed_when: "result.stdout | int > 0"
+  with_items: "{{ channels.channellist }}"
+  notify:
+    - start Gerbera
+
+- name: "Start Gerbera, if stopped"
+  service:
+    name: gerbera
+    state: started
+
+- name: "Remove temp MagentaTV multicast address list"
+  file:
+    path: "{{ gerbera_magentatv__tmp_file }}"
+    state: absent
+  changed_when: false
+
+...

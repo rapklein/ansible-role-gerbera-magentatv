@@ -1,0 +1,22 @@
+---
+# defaults file for ansible-role-gerbera-magentatv
+
+gerbera_magentatv__sqlite_db: "/etc/gerbera/gerbera.db"
+gerbera_magentatv__sqlite_db_default_schema: "/usr/local/share/gerbera/sqlite3.sql"
+gerbera_magentatv__tmp_file: "/tmp/multicastadressliste.json"
+
+gerbera_magentatv__url: "https://db.iptv.blog/multicastadressliste.json"
+
+gerbera_magentatv__load_default_db: false
+
+gerbera_magentatv__delete_pc_directory: false
+
+gerbera_magentatv__container_name: "MagentaTV"
+gerbera_magentatv__purge_container_contents: false
+
+gerbera_magentatv__udpxy_port: 5056
+
+gerbera_magentatv__owner: gerbera
+gerbera_magentatv__group: gerbera
+
+...
