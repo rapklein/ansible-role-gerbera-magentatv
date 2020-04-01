@@ -82,21 +82,19 @@
     sqlite3 "{{ gerbera_magentatv__sqlite_db }}"
     "INSERT INTO mt_cds_object ( parent_id, object_type, upnp_class, dc_title, location, resources, mime_type )
     SELECT '{{ magentatv_container_id.stdout_lines | last }}', '10', 'object.item.videoItem',
-    '({{ item.channel_pos }}) {{ item.media_name }}',
+    '({{ '%03d' | format(item.channel_pos | int ) }}) {{ item.media_name }}',
     'http://{{ gerbera_magentatv__udpxy_ip }}:{{ gerbera_magentatv__udpxy_port }}/udp/{{ item.media_multicast_sourceip }}@{{ item.media_multicast_ip }}:{{ item.media_multicast_port }}/stream.mpg',
     '0~protocolInfo=http-get%3A%2A%3Avideo%2Fmpeg2%3A%2A~~', 'video/mpeg2'
     WHERE NOT EXISTS (SELECT 1 FROM mt_cds_object WHERE
     parent_id = '{{ magentatv_container_id.stdout_lines | last }}' AND
     object_type = '10' AND
     upnp_class = 'object.item.videoItem' AND
-    dc_title = '({{ item.channel_pos }}) {{ item.media_name }}' AND
+    dc_title = '({{ '%03d' | format(item.channel_pos | int ) }}) {{ item.media_name }}' AND
     location = 'http://{{ gerbera_magentatv__udpxy_ip }}:{{ gerbera_magentatv__udpxy_port }}/udp/{{ item.media_multicast_sourceip }}@{{ item.media_multicast_ip }}:{{ item.media_multicast_port }}/stream.mpg' AND
     resources = '0~protocolInfo=http-get%3A%2A%3Avideo%2Fmpeg2%3A%2A~~' AND mime_type = 'video/mpeg2'); SELECT changes();"
   register: result
   changed_when: "result.stdout | int > 0"
   with_items: "{{ channels.channellist }}"
-  notify:
-    - start Gerbera
 
 - name: "Start Gerbera, if stopped"
   service:
