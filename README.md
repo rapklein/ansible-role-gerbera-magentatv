@@ -4,6 +4,8 @@ ansible-role-gerbera-magentatv
 * This role adds Deutsche Telekom MagentaTV channels with udpxy (multicast-to-unicast/UDP-to-HTTP relay) URLs to Gerbera (UPnP Media Server).
 * Works on Debian x86_64 (Buster and likely newer).
 
+![Screenshot-VLC-Player-Android](docs/Screenshot-VLC-Player-Android.png?raw=true)
+
 Requirements
 ------------
 
